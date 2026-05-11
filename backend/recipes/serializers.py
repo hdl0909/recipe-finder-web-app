@@ -1,25 +1,66 @@
 from rest_framework import serializers
 from .models import Product, Recipe, RecipeIngredient, UserPantry
+from django.db.models import Sum, F, ExpressionWrapper, FloatField
+
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecipeIngredient
         fields = ['product', 'weight_g']
+        extra_kwargs = {
+            'weight_g': {'min_value': 0.01},
+        }
+
 
 class RecipeSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientSerializer(many=True)
     author = serializers.StringRelatedField(read_only=True)
+    
+    total_calories = serializers.SerializerMethodField()
+    total_proteins = serializers.SerializerMethodField()
+    total_fats = serializers.SerializerMethodField()
+    total_carbs = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
-        fields = ['id', 'title', 'description', 'author', 'created_at', 'ingredients']
+        fields = [
+            'id', 'title', 'description', 'author', 'created_at', 
+            'ingredients', 'total_calories', 'total_proteins', 
+            'total_fats', 'total_carbs'
+        ]
+
+    def _calculate_kbzhu(self, ingredients_qs):
+        total_c = total_p = total_f = total_ch = 0.0
+        for ing in ingredients_qs:
+            m = ing.weight_g / 100.0
+            total_c += m * (ing.product.calories or 0)
+            total_p += m * (ing.product.proteins or 0)
+            total_f += m * (ing.product.fats or 0)
+            total_ch += m * (ing.product.carbs or 0)
+        return {
+            'calories': round(total_c, 2),
+            'proteins': round(total_p, 2),
+            'fats': round(total_f, 2),
+            'carbs': round(total_ch, 2),
+        }
+
+    def get_total_calories(self, obj):
+        return self._calculate_kbzhu(obj.ingredients.all())['calories']
+    def get_total_proteins(self, obj):
+        return self._calculate_kbzhu(obj.ingredients.all())['proteins']
+    def get_total_fats(self, obj):
+        return self._calculate_kbzhu(obj.ingredients.all())['fats']
+    def get_total_carbs(self, obj):
+        return self._calculate_kbzhu(obj.ingredients.all())['carbs']
 
     def create(self, validated_data):
         ingredients_data = validated_data.pop('ingredients')
         recipe = Recipe.objects.create(**validated_data)
-        for item in ingredients_data:
-            RecipeIngredient.objects.create(recipe=recipe, **item)
+        RecipeIngredient.objects.bulk_create([
+            RecipeIngredient(recipe=recipe, **item) for item in ingredients_data
+        ])
         return recipe
+    
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:

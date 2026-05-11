@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator
 
 class Product(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -24,6 +25,7 @@ class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(Recipe, related_name='ingredients', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     weight_g = models.FloatField()
+    weight_g = models.FloatField(validators=[MinValueValidator(0.01)])
 
 class UserPantry(models.Model):
     user = models.ForeignKey(User, related_name='pantry', on_delete=models.CASCADE)
