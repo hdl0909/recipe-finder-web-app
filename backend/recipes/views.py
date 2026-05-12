@@ -4,6 +4,22 @@ from rest_framework.response import Response
 from django.db.models import Q
 from .models import Product, Recipe, UserPantry, RecipeIngredient
 from .serializers import ProductSerializer, RecipeSerializer, UserPantrySerializer
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import UserRegisterSerializer
+
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserRegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Пользователь успешно создан"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -20,21 +36,27 @@ class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs = Recipe.objects.prefetch_related('ingredients__product')
+        
+        qs = Recipe.objects.prefetch_related('ingredients__product').order_by('-created_at')
+        
         ingredients_param = self.request.query_params.get('ingredients', '').strip()
         
         if ingredients_param:
             names = [name.strip().lower() for name in ingredients_param.split(',') if name.strip()]
             if names:
-                matching_recipes = Recipe.objects.filter(
-                    Q(ingredients__product__name__icontains=names[0])
-                ).distinct()
+                qs = Recipe.objects.filter(
+                    ingredients__product__name__icontains=names[0]
+                ).prefetch_related('ingredients__product').order_by('-created_at').distinct()
+                
                 for name in names[1:]:
-                    matching_recipes = matching_recipes.filter(
-                        Q(ingredients__product__name__icontains=name)
+                    qs = qs.filter(
+                        ingredients__product__name__icontains=name
                     ).distinct()
-                qs = matching_recipes
+                    
         return qs
+    
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
     
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny])
     def missing_ingredients(self, request, pk=None):

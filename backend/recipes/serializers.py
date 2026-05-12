@@ -1,6 +1,18 @@
 from rest_framework import serializers
 from .models import Product, Recipe, RecipeIngredient, UserPantry
 from django.db.models import Sum, F, ExpressionWrapper, FloatField
+from django.contrib.auth.models import User
+
+
+class UserRegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password']
+
+    def create(self, validated_data):
+        return User.objects.create_user(**validated_data)
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
