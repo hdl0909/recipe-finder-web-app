@@ -9,7 +9,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const { data } = await axios.post('http://localhost:8000/api/auth/token/', {
+      const { data } = await axios.post('/api/auth/token/', {
         username,
         password,
       })
