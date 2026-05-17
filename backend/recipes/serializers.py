@@ -16,12 +16,12 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+
     class Meta:
         model = RecipeIngredient
-        fields = ['product', 'weight_g']
-        extra_kwargs = {
-            'weight_g': {'min_value': 0.01},
-        }
+        fields = ['product', 'product_name', 'weight_g']
+        extra_kwargs = {'weight_g': {'min_value': 0.01}}
 
 
 class RecipeSerializer(serializers.ModelSerializer):

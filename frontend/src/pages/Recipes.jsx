@@ -31,12 +31,12 @@ export default function Recipes() {
             <div key={r.id} className="card">
                 <h3>{r.title}</h3>
                 <p className="author">Автор: {r.author}</p>
-                <p>Ккал: {r.total_calories} | Б: {r.total_proteins} | Ж: {r.total_fats} | У: {r.total_carbs}</p>
+                <p>Ккал: {r.total_calories} | Б: {r.total_proteins} г. | Ж: {r.total_fats} г. | У: {r.total_carbs} г.</p>
                 <details>
                     <summary>Ингредиенты</summary>
                     <ul>
                     {r.ingredients.map(i => (
-                        <li key={i.product}>{i.weight_g} г (ID продукта: {i.product})</li>
+                        <li key={i.product}>{i.product_name || 'Без названия'} ({i.weight_g} г.)</li>
                     ))}
                     </ul>
                 </details>
