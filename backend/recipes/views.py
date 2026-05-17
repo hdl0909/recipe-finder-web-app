@@ -2,13 +2,14 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Product, Recipe, UserPantry, RecipeIngredient
-from .serializers import ProductSerializer, RecipeSerializer, UserPantrySerializer
+from .models import Product, Recipe, UserPantry, RecipeIngredient, UserProfile
+from .serializers import ProductSerializer, RecipeSerializer, UserPantrySerializer, UserProfileSerializer
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import UserRegisterSerializer
+from rest_framework.permissions import IsAuthenticated
 
 
 class RegisterView(APIView):
@@ -79,3 +80,21 @@ class UserPantryViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Получить профиль текущего пользователя"""
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        serializer = UserProfileSerializer(profile)
+        return Response(serializer.data)
+    
+    def put(self, request):
+        """Обновить профиль текущего пользователя"""
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

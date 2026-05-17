@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Product(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -34,3 +34,50 @@ class UserPantry(models.Model):
 
     class Meta:
         unique_together = ('user', 'product')
+
+class UserProfile(models.Model):
+    GOAL_CHOICES = [
+        ('weight_loss', 'Похудение'),
+        ('maintenance', 'Поддержание веса'),
+        ('weight_gain', 'Набор массы'),
+    ]
+    
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='profile',
+        verbose_name='Пользователь'
+    )
+    age = models.PositiveIntegerField(
+        null=True, 
+        blank=True, 
+        verbose_name='Возраст',
+        validators=[MinValueValidator(1), MaxValueValidator(120)]
+    )
+    weight = models.FloatField(
+        null=True, 
+        blank=True, 
+        verbose_name='Вес (кг)',
+        validators=[MinValueValidator(30), MaxValueValidator(300)]
+    )
+    goal = models.CharField(
+        max_length=20, 
+        choices=GOAL_CHOICES, 
+        default='maintenance',
+        verbose_name='Цель питания'
+    )
+    allergens = models.TextField(
+        blank=True, 
+        verbose_name='Аллергены',
+        help_text='Перечислите продукты через запятую (например: арахис, молоко, глютен)'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создан')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлён')
+    
+    class Meta:
+        verbose_name = 'Профиль пользователя'
+        verbose_name_plural = 'Профили пользователей'
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        return f'Профиль {self.user.username}'

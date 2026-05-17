@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, Recipe, RecipeIngredient, UserPantry
+from .models import Product, Recipe, RecipeIngredient, UserPantry, UserProfile
 from django.db.models import Sum, F, ExpressionWrapper, FloatField
 from django.contrib.auth.models import User
 
@@ -83,3 +83,16 @@ class UserPantrySerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPantry
         fields = ['product', 'quantity_g']
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = UserProfile
+        fields = [
+            'id', 'username', 'email', 'age', 'weight', 
+            'goal', 'allergens', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'username', 'email', 'created_at', 'updated_at']

@@ -3,6 +3,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Recipes from './pages/Recipes'
 import CreateRecipe from './pages/CreateRecipe'
+import Profile from './pages/Profile'
 import './App.css'
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           {isAuthenticated ? (
             <>
               <Link to="/create" className="nav-link">Создать рецепт</Link>
+              <Link to="/profile" className="nav-link">Профиль</Link> {/* ← новая ссылка */}
               <button className="nav-btn" onClick={() => {
                 localStorage.clear()
                 window.location.reload()
@@ -31,6 +33,7 @@ function App() {
           <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />
           <Route path="/create" element={isAuthenticated ? <CreateRecipe /> : <Navigate to="/login" />} />
           <Route path="*" element={<Navigate to="/" />} />
+          <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
         </Routes>
       </div>
     </Router>
