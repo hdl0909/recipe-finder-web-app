@@ -32,14 +32,32 @@ class RecipeSerializer(serializers.ModelSerializer):
     total_proteins = serializers.SerializerMethodField()
     total_fats = serializers.SerializerMethodField()
     total_carbs = serializers.SerializerMethodField()
+    
+    likes_count = serializers.SerializerMethodField()
+    favorites_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_favorited = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
-        fields = [
-            'id', 'title', 'description', 'author', 'created_at', 
-            'ingredients', 'total_calories', 'total_proteins', 
-            'total_fats', 'total_carbs'
-        ]
+        fields = ['id', 'title', 'description', 'author', 'created_at', 
+                  'ingredients', 'total_calories', 'total_proteins', 
+                  'total_fats', 'total_carbs', 'likes_count', 'favorites_count',
+                  'is_liked', 'is_favorited']
+
+    def get_likes_count(self, obj):
+        return obj.liked_by.count()
+
+    def get_favorites_count(self, obj):
+        return obj.favorited_by.count()
+
+    def get_is_liked(self, obj):
+        req = self.context.get('request')
+        return req and req.user.is_authenticated and obj.liked_by.filter(id=req.user.id).exists()
+
+    def get_is_favorited(self, obj):
+        req = self.context.get('request')
+        return req and req.user.is_authenticated and obj.favorited_by.filter(id=req.user.id).exists()
 
     def _calculate_kbzhu(self, ingredients_qs):
         total_c = total_p = total_f = total_ch = 0.0

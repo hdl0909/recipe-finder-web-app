@@ -18,7 +18,9 @@ class Recipe(models.Model):
     description = models.TextField(blank=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    liked_by = models.ManyToManyField(User, related_name='liked_recipes', blank=True)
+    favorited_by = models.ManyToManyField(User, related_name='favorite_recipes', blank=True)
+    
     def __str__(self): return self.title
 
 class RecipeIngredient(models.Model):

@@ -4,6 +4,7 @@ import Register from './pages/Register'
 import Recipes from './pages/Recipes'
 import CreateRecipe from './pages/CreateRecipe'
 import Profile from './pages/Profile'
+import RecipeDetail from './pages/RecipeDetail'
 import './App.css'
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
           <Route path="/create" element={isAuthenticated ? <CreateRecipe /> : <Navigate to="/login" />} />
           <Route path="*" element={<Navigate to="/" />} />
           <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
+          <Route path="/recipes/:id" element={<RecipeDetail />} />
         </Routes>
       </div>
     </Router>

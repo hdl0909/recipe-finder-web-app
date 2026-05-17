@@ -37,8 +37,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        
-        qs = Recipe.objects.prefetch_related('ingredients__product').order_by('-created_at')
+        qs = Recipe.objects.prefetch_related('ingredients__product', 'liked_by', 'favorited_by').order_by('-created_at')
         
         ingredients_param = self.request.query_params.get('ingredients', '').strip()
         
@@ -55,6 +54,29 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     ).distinct()
                     
         return qs
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def toggle_like(self, request, pk=None):
+        recipe = self.get_object()
+        if recipe.liked_by.filter(id=request.user.id).exists():
+            recipe.liked_by.remove(request.user)
+            return Response({'status': 'unliked'})
+        recipe.liked_by.add(request.user)
+        return Response({'status': 'liked'})
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def toggle_favorite(self, request, pk=None):
+        recipe = self.get_object()
+        if recipe.favorited_by.filter(id=request.user.id).exists():
+            recipe.favorited_by.remove(request.user)
+            return Response({'status': 'unfavorited'})
+        recipe.favorited_by.add(request.user)
+        return Response({'status': 'favorited'})
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def my_favorites(self, request):
+        qs = request.user.favorite_recipes.all().prefetch_related('ingredients__product')
+        return Response(self.get_serializer(qs, many=True).data)
     
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
