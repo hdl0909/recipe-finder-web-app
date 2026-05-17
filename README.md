@@ -1,6 +1,6 @@
 # recipe-finder-web-app
 инструкция:  
-1)git clone https://github.com/Trofimov44/recipe-finder-web-app recipe-finder-web-app  
+1)git clone https://github.com/Trofimov44/recipe-finder-web-app
 2)cd recipe-finder-web-app  
 3)docker-compose up -d --build  
 4)docker-compose exec backend python manage.py migrate  
