@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, Recipe, RecipeIngredient, UserPantry, UserProfile
+from .models import Product, Recipe, RecipeIngredient, UserPantry, UserProfile, Comment
 from django.db.models import Sum, F, ExpressionWrapper, FloatField
 from django.contrib.auth.models import User
 
@@ -114,3 +114,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'goal', 'allergens', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'username', 'email', 'created_at', 'updated_at']
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'recipe', 'author', 'text', 'created_at']
+        read_only_fields = ['id', 'author', 'created_at']

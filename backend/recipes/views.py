@@ -2,8 +2,8 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Product, Recipe, UserPantry, RecipeIngredient, UserProfile
-from .serializers import ProductSerializer, RecipeSerializer, UserPantrySerializer, UserProfileSerializer
+from .models import Product, Recipe, UserPantry, RecipeIngredient, UserProfile, Comment
+from .serializers import ProductSerializer, RecipeSerializer, UserPantrySerializer, UserProfileSerializer, CommentSerializer
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -120,3 +120,16 @@ class UserProfileView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class CommentViewSet(viewsets.ModelViewSet):
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        qs = Comment.objects.select_related('author', 'recipe')
+        recipe_id = self.request.query_params.get('recipe')
+        return qs.filter(recipe_id=recipe_id) if recipe_id else qs
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
