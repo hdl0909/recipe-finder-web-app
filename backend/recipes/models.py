@@ -96,3 +96,41 @@ class Comment(models.Model):
 
     def __str__(self):
         return f'{self.author.username} → {self.recipe.title}'
+    
+
+class FoodDiaryEntry(models.Model):
+    MEAL_TYPE_CHOICES = [
+        ('breakfast', 'Завтрак'),
+        ('lunch', 'Обед'),
+        ('dinner', 'Ужин'),
+        ('snack', 'Перекус'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='diary_entries')
+    recipe = models.ForeignKey('Recipe', on_delete=models.CASCADE, related_name='diary_entries', null=True, blank=True)
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='diary_entries', null=True, blank=True)
+    
+    meal_type = models.CharField(max_length=20, choices=MEAL_TYPE_CHOICES, default='lunch')
+    date = models.DateField()
+    portion_size = models.FloatField(validators=[MinValueValidator(1), MaxValueValidator(5000)], help_text='Вес порции в граммах')
+    
+    calories = models.FloatField(default=0)
+    proteins = models.FloatField(default=0)
+    fats = models.FloatField(default=0)
+    carbs = models.FloatField(default=0)
+    
+    notes = models.TextField(blank=True, max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+        indexes = [
+            models.Index(fields=['user', 'date']),
+            models.Index(fields=['user', 'meal_type']),
+        ]
+
+    def __str__(self):
+        item = self.recipe.title if self.recipe else (self.product.name if self.product else 'Продукт')
+        return f'{self.user.username} — {item} ({self.get_meal_type_display()})'
+
+    

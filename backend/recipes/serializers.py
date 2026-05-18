@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, Recipe, RecipeIngredient, UserPantry, UserProfile, Comment
+from .models import Product, Recipe, RecipeIngredient, UserPantry, UserProfile, Comment, FoodDiaryEntry
 from django.db.models import Sum, F, ExpressionWrapper, FloatField
 from django.contrib.auth.models import User
 
@@ -122,3 +122,31 @@ class CommentSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ['id', 'recipe', 'author', 'text', 'created_at']
         read_only_fields = ['id', 'author', 'created_at']
+
+    
+class FoodDiaryEntrySerializer(serializers.ModelSerializer):
+    recipe_title = serializers.SerializerMethodField()
+    product_name = serializers.SerializerMethodField()
+    meal_type_display = serializers.CharField(source='get_meal_type_display', read_only=True)
+
+    class Meta:
+        model = FoodDiaryEntry
+        fields = ['id', 'recipe', 'recipe_title', 'product', 'product_name', 
+                  'meal_type', 'meal_type_display', 'date', 'portion_size', 
+                  'calories', 'proteins', 'fats', 'carbs', 'notes', 'created_at']
+        read_only_fields = ['id', 'calories', 'proteins', 'fats', 'carbs', 'created_at']
+
+    def get_recipe_title(self, obj):
+        return obj.recipe.title if obj.recipe else ""
+
+    def get_product_name(self, obj):
+        return obj.product.name if obj.product else ""
+
+    def validate(self, data):
+        has_recipe = bool(data.get('recipe'))
+        has_product = bool(data.get('product'))
+        if not has_recipe and not has_product:
+            raise serializers.ValidationError({'non_field_errors': ['Укажите рецепт или продукт']})
+        if has_recipe and has_product:
+            raise serializers.ValidationError({'non_field_errors': ['Укажите только одно']})
+        return data
