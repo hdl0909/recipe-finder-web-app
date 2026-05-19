@@ -38,22 +38,26 @@ class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs = Recipe.objects.prefetch_related('ingredients__product', 'liked_by', 'favorited_by').order_by('-created_at')
-        
-        ingredients_param = self.request.query_params.get('ingredients', '').strip()
-        
-        if ingredients_param:
-            names = [name.strip().lower() for name in ingredients_param.split(',') if name.strip()]
-            if names:
-                qs = Recipe.objects.filter(
-                    ingredients__product__name__icontains=names[0]
-                ).prefetch_related('ingredients__product').order_by('-created_at').distinct()
-                
-                for name in names[1:]:
-                    qs = qs.filter(
-                        ingredients__product__name__icontains=name
-                    ).distinct()
-                    
+        qs = Recipe.objects.prefetch_related(
+            'ingredients__product', 'liked_by', 'favorited_by'
+        ).order_by('-created_at')
+
+        title = self.request.query_params.get('title', '').strip()
+        ingredients_str = self.request.query_params.get('ingredients', '').strip()
+
+        # Поиск по названию
+        if title:
+            qs = qs.filter(title__icontains=title)
+
+        # Поиск по ингредиентам (Ищем рецепты, содержащие ВСЕ указанные продукты)
+        if ingredients_str:
+            ing_names = [i.strip() for i in ingredients_str.split(',') if i.strip()]
+            if ing_names:
+                q_objects = Q()
+                for name in ing_names:
+                    q_objects &= Q(ingredients__product__name__icontains=name)
+                qs = qs.filter(q_objects).distinct()
+
         return qs
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])

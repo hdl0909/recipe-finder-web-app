@@ -38,12 +38,17 @@ class RecipeSerializer(serializers.ModelSerializer):
     is_liked = serializers.SerializerMethodField()
     is_favorited = serializers.SerializerMethodField()
 
+    has_allergens = serializers.SerializerMethodField()
+    matched_allergens = serializers.SerializerMethodField()
+    
     class Meta:
         model = Recipe
-        fields = ['id', 'title', 'description', 'author', 'created_at', 
-                  'ingredients', 'total_calories', 'total_proteins', 
-                  'total_fats', 'total_carbs', 'likes_count', 'favorites_count',
-                  'is_liked', 'is_favorited']
+        fields = [
+            'id', 'title', 'description', 'author', 'created_at', 
+            'ingredients', 'total_calories', 'total_proteins', 
+            'total_fats', 'total_carbs', 'likes_count', 'favorites_count',
+            'is_liked', 'is_favorited', 'has_allergens', 'matched_allergens'
+        ]
 
     def get_likes_count(self, obj):
         return obj.liked_by.count()
@@ -90,6 +95,38 @@ class RecipeSerializer(serializers.ModelSerializer):
             RecipeIngredient(recipe=recipe, **item) for item in ingredients_data
         ])
         return recipe
+    
+    def _get_user_allergens(self, request):
+        try:
+            if not request or not hasattr(request, 'user') or not request.user.is_authenticated:
+                return []
+            profile = getattr(request.user, 'profile', None)
+            if not profile or not profile.allergens:
+                return []
+            return [a.strip().lower() for a in profile.allergens.split(',') if a.strip()]
+        except Exception:
+            return []
+
+    def get_matched_allergens(self, obj):
+        user_allergens = self._get_user_allergens(self.context.get('request'))
+        if not user_allergens:
+            return []
+
+        matched = set()
+        try:
+            for ing in obj.ingredients.all():
+                if not ing.product or not ing.product.name:
+                    continue
+                prod_name = ing.product.name.lower()
+                for allergen in user_allergens:
+                    if allergen in prod_name or prod_name in allergen:
+                        matched.add(ing.product.name)
+        except Exception:
+            pass
+        return list(matched)
+
+    def get_has_allergens(self, obj):
+        return len(self.get_matched_allergens(obj)) > 0
     
 
 class ProductSerializer(serializers.ModelSerializer):

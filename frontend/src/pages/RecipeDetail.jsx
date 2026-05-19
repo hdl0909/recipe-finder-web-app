@@ -49,6 +49,15 @@ export default function RecipeDetail() {
     <div className="recipe-detail">
       <button className="back-btn" onClick={() => navigate(-1)}>← Назад</button>
       <h1>{recipe.title}</h1>
+      {recipe.has_allergens && (
+        <div className="allergen-alert">
+          <span className="alert-icon">🚨</span>
+          <div>
+            <strong>Внимание: рецепт содержит аллергены!</strong>
+            <p>В составе обнаружены: {recipe.matched_allergens?.join(', ') || 'указанные в профиле'}</p>
+          </div>
+        </div>
+      )}
       <p className="meta">Автор: {recipe.author} | ❤️ {recipe.likes_count} | ⭐ {recipe.favorites_count}</p>
       <p className="desc">{recipe.description}</p>
       
