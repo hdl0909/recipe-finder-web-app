@@ -5,7 +5,7 @@ import client from '../api/client'
 export default function Recipes() {
   const navigate = useNavigate()
   const inputRef = useRef(null)
-  const hasFetched = useRef(false) // Защита от StrictMode double-fetch
+  const hasFetched = useRef(false)
   
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(false)
@@ -14,6 +14,8 @@ export default function Recipes() {
   const [selectedIngredients, setSelectedIngredients] = useState([])
   const [suggestions, setSuggestions] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
+  const [recommended, setRecommended] = useState([])
+  const [recsLoading, setRecsLoading] = useState(true)
 
   const fetchRecipes = async (title, ingredients) => {
     setLoading(true)
@@ -32,12 +34,23 @@ export default function Recipes() {
     }
   }
 
-  // Срабатывает строго один раз при монтировании
+  // Загрузка рецептов при монтировании
   useEffect(() => {
     if (!hasFetched.current) {
       hasFetched.current = true
       fetchRecipes('', [])
     }
+  }, [])
+
+  // Загрузка рекомендаций
+  useEffect(() => {
+    client.get('/recipes/recommendations/')
+      .then(res => {
+        const list = Array.isArray(res.data) ? res.data : (res.data.results || [])
+        setRecommended(list)
+      })
+      .catch(() => setRecsLoading(false))
+      .finally(() => setRecsLoading(false))
   }, [])
 
   const handleIngredientInput = async (e) => {
@@ -84,6 +97,28 @@ export default function Recipes() {
     <div className="recipes-page">
       <h2>📖 Рецепты</h2>
       
+      {/* Блок рекомендаций — теперь ВНУТРИ return */}
+      {recommended.length > 0 && (
+        <section className="recommendations-block">
+          <h3>Рекомендуем вам</h3>
+          <div className="grid">
+            {recommended.slice(0, 4).map(r => (
+              <div key={`rec-${r.id}`} className="card" onClick={() => navigate(`/recipes/${r.id}`)}>
+                <h3 className="recipe-title">{r.title}</h3>
+                <div className="card-actions" onClick={e => e.stopPropagation()}>
+                  <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_like')}>
+                    {r.is_liked ? '❤️' : '🤍'} {r.likes_count || 0}
+                  </span>
+                </div>
+                <p className="author">Автор: {r.author}</p>
+                <p>Ккал: {r.total_calories} | Б: {r.total_proteins}г | Ж: {r.total_fats}г | У: {r.total_carbs}г</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      
+      {/* Панель поиска */}
       <div className="search-panel">
         <div className="search-row">
           <div className="search-group">
@@ -103,16 +138,23 @@ export default function Recipes() {
 
         {selectedIngredients.length > 0 && (
           <div className="tags-container">
-            {selectedIngredients.map(ing => (<span key={ing} className="tag">{ing} <button type="button" onClick={() => setSelectedIngredients(prev => prev.filter(i => i !== ing))}>✕</button></span>))}
+            {selectedIngredients.map(ing => (
+              <span key={ing} className="tag">
+                {ing} <button type="button" onClick={() => setSelectedIngredients(prev => prev.filter(i => i !== ing))}>✕</button>
+              </span>
+            ))}
           </div>
         )}
 
         <div className="search-buttons">
-          <button className="btn-search" onClick={handleSearch} disabled={loading}>{loading ? 'Поиск...' : '🔍 Найти'}</button>
+          <button className="btn-search" onClick={handleSearch} disabled={loading}>
+            {loading ? 'Поиск...' : '🔍 Найти'}
+          </button>
           <button className="btn-reset" onClick={handleReset}>Сбросить</button>
         </div>
       </div>
 
+      {/* Сетка рецептов */}
       <div className="grid">
         {loading ? (
           <p className="empty-state">Загрузка...</p>
@@ -123,17 +165,29 @@ export default function Recipes() {
             <div key={r.id} className="card" onClick={() => navigate(`/recipes/${r.id}`)}>
               <h3 className="recipe-title">
                 {r.title}
-                {r.has_allergens && (<span className="allergen-badge" title={`Содержит: ${r.matched_allergens?.join(', ')}`}>⚠️ Аллерген</span>)}
+                {r.has_allergens && (
+                  <span className="allergen-badge" title={`Содержит: ${r.matched_allergens?.join(', ')}`}>
+                    ⚠️ Аллерген
+                  </span>
+                )}
               </h3>
               <div className="card-actions" onClick={e => e.stopPropagation()}>
-                <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_like')}>{r.is_liked ? '❤️' : '🤍'} {r.likes_count || 0}</span>
-                <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_favorite')}>{r.is_favorited ? '⭐' : '☆'} {r.favorites_count || 0}</span>
+                <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_like')}>
+                  {r.is_liked ? '❤️' : '🤍'} {r.likes_count || 0}
+                </span>
+                <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_favorite')}>
+                  {r.is_favorited ? '⭐' : '☆'} {r.favorites_count || 0}
+                </span>
               </div>
               <p className="author">Автор: {r.author}</p>
               <p>Ккал: {r.total_calories} | Б: {r.total_proteins}г | Ж: {r.total_fats}г | У: {r.total_carbs}г</p>
               <details>
                 <summary>Ингредиенты</summary>
-                <ul>{r.ingredients.map(i => (<li key={i.product}>{i.product_name || 'Без названия'} ({i.weight_g} г.)</li>))}</ul>
+                <ul>
+                  {r.ingredients.map(i => (
+                    <li key={i.product}>{i.product_name || 'Без названия'} ({i.weight_g} г.)</li>
+                  ))}
+                </ul>
               </details>
             </div>
           ))

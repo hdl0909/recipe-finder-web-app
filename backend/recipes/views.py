@@ -12,6 +12,7 @@ from .serializers import UserRegisterSerializer
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum, Count
 from datetime import datetime, timedelta
+from django.core.cache import cache
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -98,6 +99,54 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response({'missing': list(missing), 'available': list(recipe_products - missing)})
     
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def recommendations(self, request):
+        user = request.user
+        cache_key = f"recs_{user.id}"
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        liked_ids = list(user.liked_recipes.values_list('id', flat=True))
+
+        if len(liked_ids) < 2:
+            qs = Recipe.objects.exclude(id__in=liked_ids).annotate(
+                _likes_count=Count('liked_by', distinct=True)
+            ).order_by('-_likes_count', '-created_at')[:10]
+            data = self.get_serializer(qs, many=True).data
+            cache.set(cache_key, data, 1800)
+            return Response(data)
+
+        from django.contrib.auth.models import User
+        similar_user_ids = list(
+            User.objects.filter(liked_recipes__in=liked_ids)
+            .exclude(id=user.id)
+            .values_list('id', flat=True)
+            .distinct()
+        )
+
+        if not similar_user_ids:
+            qs = Recipe.objects.exclude(id__in=liked_ids).annotate(
+                _likes_count=Count('liked_by', distinct=True)
+            ).order_by('-_likes_count', '-created_at')[:10]
+            data = self.get_serializer(qs, many=True).data
+            cache.set(cache_key, data, 1800)
+            return Response(data)
+
+        qs = Recipe.objects.exclude(id__in=liked_ids).filter(
+            liked_by__in=similar_user_ids
+        ).annotate(
+            similarity_score=Count(
+                'liked_by', 
+                filter=Q(liked_by__in=similar_user_ids), 
+                distinct=True
+            )
+        ).order_by('-similarity_score', '-created_at').distinct()[:10]
+
+        data = self.get_serializer(qs, many=True).data
+        cache.set(cache_key, data, 3600)  # кэш 1 час
+        return Response(data)
+    
 class UserPantryViewSet(viewsets.ModelViewSet):
     serializer_class = UserPantrySerializer
     permission_classes = [permissions.IsAuthenticated]
