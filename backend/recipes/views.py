@@ -132,7 +132,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             data = self.get_serializer(qs, many=True).data
             cache.set(cache_key, data, 1800)
             return Response(data)
-
+        
         qs = Recipe.objects.exclude(id__in=liked_ids).filter(
             liked_by__in=similar_user_ids
         ).annotate(
@@ -144,15 +144,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
         ).order_by('-similarity_score', '-created_at').distinct()[:10]
 
         data = self.get_serializer(qs, many=True).data
-        cache.set(cache_key, data, 3600)  # кэш 1 час
+        cache.set(cache_key, data, 3600)  
         return Response(data)
     
 class UserPantryViewSet(viewsets.ModelViewSet):
     serializer_class = UserPantrySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return UserPantry.objects.filter(user=self.request.user)
+        return UserPantry.objects.filter(user=self.request.user).select_related('product')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

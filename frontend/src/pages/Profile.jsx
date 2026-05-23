@@ -1,155 +1,130 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import client from '../api/client'
 
 export default function Profile() {
-  const [profile, setProfile] = useState({ age: '', weight: '', goal: 'maintenance', allergens: '' })
-  const [favorites, setFavorites] = useState([])
+  const [profile, setProfile] = useState({ allergens: '' })
+  const [pantry, setPantry] = useState([])
+  const [newProduct, setNewProduct] = useState('')
+  const [newQty, setNewQty] = useState(100)
+  const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState({ type: '', text: '' })
-  const navigate = useNavigate()
 
-  // Загрузка профиля и избранного
+  // Загрузка данных профиля и холодильника
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Профиль
-        const { data: profileData } = await client.get('/profile/')
-        setProfile({
-          age: profileData.age ?? '',
-          weight: profileData.weight ?? '',
-          goal: profileData.goal || 'maintenance',
-          allergens: profileData.allergens || ''
-        })
-        
-        // Избранное
-        const { data: favData } = await client.get('/recipes/my_favorites/')
-        setFavorites(favData)
-      } catch (err) {
-        const status = err.response?.status
-        const detail = err.response?.data?.detail || 'Сервер недоступен'
-        setMessage({ type: 'error', text: `Ошибка загрузки (${status}): ${detail}` })
-        if (status === 401) navigate('/login')
-      } finally {
-        setLoading(false)
-      }
+        const [profRes, pantryRes] = await Promise.all([
+          client.get('/profile/'),
+          client.get('/pantry/')
+        ])
+        setProfile(profRes.data)
+        setPantry(pantryRes.data.results || pantryRes.data)
+      } catch (err) { console.error(err) }
+      finally { setLoading(false) }
     }
     loadData()
-  }, [navigate])
+  }, [])
 
-  const handleChange = (e) => {
-    setProfile(prev => ({ ...prev, [e.target.name]: e.target.value }))
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setMessage({ type: '', text: '' })
-
+  // Сохранение аллергенов
+  const saveProfile = async () => {
     try {
-      const payload = {
-        age: profile.age ? parseInt(profile.age) : null,
-        weight: profile.weight ? parseFloat(profile.weight) : null,
-        goal: profile.goal,
-        allergens: profile.allergens
-      }
-      await client.put('/profile/', payload)
-      setMessage({ type: 'success', text: 'Профиль успешно обновлён!' })
-    } catch (err) {
-      const detail = err.response?.data?.non_field_errors?.[0] || 
-                     JSON.stringify(err.response?.data) || 'Неизвестная ошибка'
-      setMessage({ type: 'error', text: `Ошибка сохранения: ${detail}` })
-    } finally {
-      setSaving(false)
-    }
+      await client.put('/profile/', profile)
+      alert('Профиль сохранен')
+    } catch (err) { alert('Ошибка сохранения') }
   }
 
-  if (loading) return <div className="profile-loading">Загрузка...</div>
+  // Поиск продукта для добавления в холодильник
+  const handleSearchProduct = async (e) => {
+    const val = e.target.value
+    setNewProduct(val)
+    if (val.length < 2) { setSuggestions([]); return }
+    try {
+      const res = await client.get(`/products/?search=${val}`)
+      setSuggestions(res.data.results || res.data || [])
+    } catch {}
+  }
+
+  // Добавление в холодильник
+  const addToPantry = async (prod) => {
+    try {
+      await client.post('/pantry/', { product_id: prod.id, quantity: newQty })
+      // Оптимистичное обновление списка
+      setPantry(prev => [...prev, { id: Date.now(), product_name: prod.name, quantity: newQty }])
+      setNewProduct('')
+      setSuggestions([])
+    } catch (err) { alert('Ошибка добавления') }
+  }
+
+  // Удаление из холодильника
+  const removeFromPantry = async (id) => {
+    try {
+      await client.delete(`/pantry/${id}/`)
+      setPantry(prev => prev.filter(item => item.id !== id))
+    } catch {}
+  }
+
+  if (loading) return <div className="loading">Загрузка...</div>
 
   return (
     <div className="profile-page">
-      <h2>Личный кабинет</h2>
+      <h2>Профиль и настройки</h2>
       
-      {message.text && (
-        <div className={`alert alert-${message.type}`}>{message.text}</div>
-      )}
-      
-      {/* Форма профиля */}
-      <form onSubmit={handleSubmit} className="profile-form">
-        <div className="form-group">
-          <label>Возраст (лет)</label>
-          <input
-            type="number"
-            name="age"
-            value={profile.age}
-            onChange={handleChange}
-            min="1"
-            max="120"
-            placeholder="25"
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>Вес (кг)</label>
-          <input
-            type="number"
-            name="weight"
-            value={profile.weight}
-            onChange={handleChange}
-            min="30"
-            max="300"
-            step="0.1"
-            placeholder="70.5"
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>Цель питания</label>
-          <select name="goal" value={profile.goal} onChange={handleChange}>
-            <option value="weight_loss">Похудение</option>
-            <option value="maintenance">Поддержание веса</option>
-            <option value="weight_gain">Набор массы</option>
-          </select>
-        </div>
-        
-        <div className="form-group">
-          <label>Аллергены и непереносимые продукты</label>
-          <textarea
-            name="allergens"
-            value={profile.allergens}
-            onChange={handleChange}
-            rows="3"
-            placeholder="арахис, молоко, глютен"
-          />
-          <small>Перечислите через запятую. Рецепты с этими ингредиентами будут помечены.</small>
-        </div>
-        
-        <button type="submit" disabled={saving}>
-          {saving ? 'Сохранение...' : 'Сохранить изменения'}
-        </button>
-      </form>
+      {/* Секция Аллергенов */}
+      <section className="profile-section">
+        <h3>Аллергены и ограничения</h3>
+        <p className="hint">Введите продукты через запятую (например: орехи, молоко, глютен)</p>
+        <textarea 
+          value={profile.allergens || ''} 
+          onChange={e => setProfile({...profile, allergens: e.target.value})}
+          rows="3"
+          placeholder="Список аллергенов..."
+        />
+        <button className="btn-primary" onClick={saveProfile}>Сохранить профиль</button>
+      </section>
 
-      {/* Блок избранного */}
-      {favorites.length > 0 && (
-        <section className="favorites-section">
-          <h2>⭐ Избранное</h2>
-          <div className="favorites-grid">
-            {favorites.map(r => (
-              <div 
-                key={r.id} 
-                className="card" 
-                onClick={() => navigate(`/recipes/${r.id}`)}
-                style={{ cursor: 'pointer' }}
-              >
-                <h4>{r.title}</h4>
-                <p className="author">Автор: {r.author}</p>
-                <small>❤️ {r.likes_count || 0} | ⭐ {r.favorites_count || 0}</small>
-              </div>
-            ))}
+      {/* Секция Холодильника */}
+      <section className="profile-section">
+        <h3>Мой холодильник</h3>
+        <p className="hint">Добавьте продукты, которые у вас есть дома, чтобы видеть недостающие ингредиенты в рецептах.</p>
+        
+        <div className="add-pantry-form">
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input 
+              placeholder="Найти продукт..." 
+              value={newProduct} 
+              onChange={handleSearchProduct} 
+            />
+            {suggestions.length > 0 && (
+              <ul className="suggestions-list">
+                {suggestions.map(p => (
+                  <li key={p.id} onMouseDown={() => addToPantry(p)}>{p.name}</li>
+                ))}
+              </ul>
+            )}
           </div>
-        </section>
-      )}
+          <input 
+            type="number" 
+            placeholder="Граммы" 
+            value={newQty} 
+            onChange={e => setNewQty(e.target.value)} 
+            style={{ width: '100px' }}
+          />
+          <button className="btn-secondary" disabled={!newProduct}>Добавить</button>
+        </div>
+
+        <div className="pantry-list">
+          {pantry.length === 0 ? <p>Холодильник пуст</p> : (
+            <ul>
+              {pantry.map(item => (
+                <li key={item.id}>
+                  <span>{item.product_name} -- <b>{item.quantity} г.</b></span>
+                  <button className="btn-delete" onClick={() => removeFromPantry(item.id)}>x</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     </div>
   )
 }

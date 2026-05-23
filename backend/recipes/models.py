@@ -30,12 +30,15 @@ class RecipeIngredient(models.Model):
     weight_g = models.FloatField(validators=[MinValueValidator(0.01)])
 
 class UserPantry(models.Model):
-    user = models.ForeignKey(User, related_name='pantry', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    quantity_g = models.FloatField(default=0)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='pantry_items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.FloatField(default=0, help_text="Количество в граммах или штуках")
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ('user', 'product')
+    def __str__(self):
+        return f'{self.user.username}: {self.product.name} ({self.quantity})'
 
 class UserProfile(models.Model):
     GOAL_CHOICES = [
@@ -133,4 +136,3 @@ class FoodDiaryEntry(models.Model):
         item = self.recipe.title if self.recipe else (self.product.name if self.product else 'Продукт')
         return f'{self.user.username} — {item} ({self.get_meal_type_display()})'
 
-    

@@ -40,6 +40,7 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     has_allergens = serializers.SerializerMethodField()
     matched_allergens = serializers.SerializerMethodField()
+    missing_ingredients = serializers.SerializerMethodField()
     
     class Meta:
         model = Recipe
@@ -47,7 +48,8 @@ class RecipeSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'author', 'created_at', 
             'ingredients', 'total_calories', 'total_proteins', 
             'total_fats', 'total_carbs', 'likes_count', 'favorites_count',
-            'is_liked', 'is_favorited', 'has_allergens', 'matched_allergens'
+            'is_liked', 'is_favorited', 'has_allergens', 'matched_allergens',
+            'missing_ingredients'
         ]
 
     def get_likes_count(self, obj):
@@ -128,6 +130,25 @@ class RecipeSerializer(serializers.ModelSerializer):
     def get_has_allergens(self, obj):
         return len(self.get_matched_allergens(obj)) > 0
     
+    def get_missing_ingredients(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return []
+        
+        user_pantry_products = set(
+            UserPantry.objects.filter(user=request.user).values_list('product_id', flat=True)
+        )
+        
+        missing = []
+        for ing in obj.ingredients.all():
+            if ing.product_id not in user_pantry_products:
+                missing.append({
+                    'id': ing.product_id,
+                    'name': ing.product.name,
+                    'needed_weight': ing.weight_g
+                })
+        return missing
+    
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
@@ -135,9 +156,12 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class UserPantrySerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), source='product', write_only=True)
+
     class Meta:
         model = UserPantry
-        fields = ['product', 'quantity_g']
+        fields = ['id', 'product_id', 'product_name', 'quantity']
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

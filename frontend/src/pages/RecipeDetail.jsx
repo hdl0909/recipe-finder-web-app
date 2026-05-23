@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import client from '../api/client'
 
 export default function RecipeDetail() {
@@ -48,7 +48,10 @@ export default function RecipeDetail() {
   return (
     <div className="recipe-detail">
       <button className="back-btn" onClick={() => navigate(-1)}>← Назад</button>
+      
       <h1>{recipe.title}</h1>
+      
+      {/* Предупреждение об аллергенах */}
       {recipe.has_allergens && (
         <div className="allergen-alert">
           <span className="alert-icon">🚨</span>
@@ -58,6 +61,7 @@ export default function RecipeDetail() {
           </div>
         </div>
       )}
+
       <p className="meta">Автор: {recipe.author} | ❤️ {recipe.likes_count} | ⭐ {recipe.favorites_count}</p>
       <p className="desc">{recipe.description}</p>
       
@@ -65,6 +69,7 @@ export default function RecipeDetail() {
         Ккал: {recipe.total_calories} | Б: {recipe.total_proteins}г | Ж: {recipe.total_fats}г | У: {recipe.total_carbs}г
       </div>
 
+      {/* Ингредиенты */}
       <h3>Ингредиенты</h3>
       <ul className="ing-list">
         {recipe.ingredients.map(i => (
@@ -72,6 +77,24 @@ export default function RecipeDetail() {
         ))}
       </ul>
 
+      {/* Блок недостающих продуктов (Кладовая) */}
+      {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
+        <div className="missing-block">
+          <h3>Нужно докупить:</h3>
+          <ul className="missing-list">
+            {recipe.missing_ingredients.map((ing, idx) => (
+              <li key={idx}>
+                {ing.name} <span className="weight-badge">{ing.needed_weight} г.</span>
+              </li>
+            ))}
+          </ul>
+          <p className="hint-text">
+            Этих продуктов нет в вашем <Link to="/profile">холодильнике</Link>.
+          </p>
+        </div>
+      )}
+
+      {/* Комментарии */}
       <section className="comments-section">
         <h3>Комментарии ({comments.length})</h3>
         <form onSubmit={handleAddComment} className="comment-form">

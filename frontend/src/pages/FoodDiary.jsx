@@ -141,7 +141,7 @@ export default function FoodDiary() {
 
   return (
     <div className="diary-page">
-      <h2>📓 Дневник питания</h2>
+      <h2>Дневник питания</h2>
       
       <div className="date-picker">
         <label>Дата: 
@@ -153,10 +153,10 @@ export default function FoodDiary() {
         <div className="daily-summary">
           <h3>Итого за {dailyStats.date}</h3>
           <div className="stats-grid">
-            <div className="stat-card">🔥 {dailyStats.totals.calories} ккал</div>
-            <div className="stat-card">🥩 {dailyStats.totals.proteins}г Б</div>
-            <div className="stat-card">🧈 {dailyStats.totals.fats}г Ж</div>
-            <div className="stat-card">🍞 {dailyStats.totals.carbs}г У</div>
+            <div className="stat-card">{dailyStats.totals.calories} ккал</div>
+            <div className="stat-card">{dailyStats.totals.proteins}г Б</div>
+            <div className="stat-card">{dailyStats.totals.fats}г Ж</div>
+            <div className="stat-card">{dailyStats.totals.carbs}г У</div>
           </div>
         </div>
       )}

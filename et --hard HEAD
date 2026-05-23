@@ -1,0 +1,266 @@
+[1mdiff --git a/backend/recipes/views.py b/backend/recipes/views.py[m
+[1mindex 1956d81..52163b4 100644[m
+[1m--- a/backend/recipes/views.py[m
+[1m+++ b/backend/recipes/views.py[m
+[36m@@ -12,6 +12,7 @@[m [mfrom .serializers import UserRegisterSerializer[m
+ from rest_framework.permissions import IsAuthenticated[m
+ from django.db.models import Sum, Count[m
+ from datetime import datetime, timedelta[m
+[32m+[m[32mfrom django.core.cache import cache[m
+ [m
+ class RegisterView(APIView):[m
+     permission_classes = [AllowAny][m
+[36m@@ -98,6 +99,54 @@[m [mclass RecipeViewSet(viewsets.ModelViewSet):[m
+         return Response({'missing': list(missing), 'available': list(recipe_products - missing)})[m
+     [m
+ [m
+[32m+[m[32m    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])[m
+[32m+[m[32m    def recommendations(self, request):[m
+[32m+[m[32m        user = request.user[m
+[32m+[m[32m        cache_key = f"recs_{user.id}"[m
+[32m+[m[32m        cached = cache.get(cache_key)[m
+[32m+[m[32m        if cached:[m
+[32m+[m[32m            return Response(cached)[m
+[32m+[m
+[32m+[m[32m        liked_ids = list(user.liked_recipes.values_list('id', flat=True))[m
+[32m+[m
+[32m+[m[32m        if len(liked_ids) < 2:[m
+[32m+[m[32m            qs = Recipe.objects.exclude(id__in=liked_ids).annotate([m
+[32m+[m[32m                _likes_count=Count('liked_by', distinct=True)[m
+[32m+[m[32m            ).order_by('-_likes_count', '-created_at')[:10][m
+[32m+[m[32m            data = self.get_serializer(qs, many=True).data[m
+[32m+[m[32m            cache.set(cache_key, data, 1800)[m
+[32m+[m[32m            return Response(data)[m
+[32m+[m
+[32m+[m[32m        from django.contrib.auth.models import User[m
+[32m+[m[32m        similar_user_ids = list([m
+[32m+[m[32m            User.objects.filter(liked_recipes__in=liked_ids)[m
+[32m+[m[32m            .exclude(id=user.id)[m
+[32m+[m[32m            .values_list('id', flat=True)[m
+[32m+[m[32m            .distinct()[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        if not similar_user_ids:[m
+[32m+[m[32m            qs = Recipe.objects.exclude(id__in=liked_ids).annotate([m
+[32m+[m[32m                _likes_count=Count('liked_by', distinct=True)[m
+[32m+[m[32m            ).order_by('-_likes_count', '-created_at')[:10][m
+[32m+[m[32m            data = self.get_serializer(qs, many=True).data[m
+[32m+[m[32m            cache.set(cache_key, data, 1800)[m
+[32m+[m[32m            return Response(data)[m
+[32m+[m
+[32m+[m[32m        qs = Recipe.objects.exclude(id__in=liked_ids).filter([m
+[32m+[m[32m            liked_by__in=similar_user_ids[m
+[32m+[m[32m        ).annotate([m
+[32m+[m[32m            similarity_score=Count([m
+[32m+[m[32m                'liked_by',[m[41m [m
+[32m+[m[32m                filter=Q(liked_by__in=similar_user_ids),[m[41m [m
+[32m+[m[32m                distinct=True[m
+[32m+[m[32m            )[m
+[32m+[m[32m        ).order_by('-similarity_score', '-created_at').distinct()[:10][m
+[32m+[m
+[32m+[m[32m        data = self.get_serializer(qs, many=True).data[m
+[32m+[m[32m        cache.set(cache_key, data, 3600)  # кэш 1 час[m
+[32m+[m[32m        return Response(data)[m
+[32m+[m[41m    [m
+ class UserPantryViewSet(viewsets.ModelViewSet):[m
+     serializer_class = UserPantrySerializer[m
+     permission_classes = [permissions.IsAuthenticated][m
+[1mdiff --git a/frontend/src/App.css b/frontend/src/App.css[m
+[1mindex 0b7b4d8..5a1b19b 100644[m
+[1m--- a/frontend/src/App.css[m
+[1m+++ b/frontend/src/App.css[m
+[36m@@ -154,4 +154,53 @@[m [mbody { margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; }[m
+ /* Адаптив */[m
+ @media (max-width: 600px) {[m
+   .search-row { grid-template-columns: 1fr; }[m
+[31m-}[m
+\ No newline at end of file[m
+[32m+[m[32m}[m
+[32m+[m[32m/* === Обновлённая навигация === */[m
+[32m+[m[32m.navbar {[m
+[32m+[m[32m  display: flex;[m
+[32m+[m[32m  justify-content: space-between;[m
+[32m+[m[32m  align-items: center;[m
+[32m+[m[32m  padding: 12px 20px;[m
+[32m+[m[32m  background: var(--surface);[m
+[32m+[m[32m  box-shadow: var(--shadow-sm);[m
+[32m+[m[32m  position: sticky;[m
+[32m+[m[32m  top: 0;[m
+[32m+[m[32m  z-index: 100;[m
+[32m+[m[32m  gap: 8px;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.nav-link {[m
+[32m+[m[32m  padding: 8px 12px;[m
+[32m+[m[32m  color: var(--text);[m
+[32m+[m[32m  font-weight: 500;[m
+[32m+[m[32m  border-radius: 8px;[m
+[32m+[m[32m  transition: all 0.2s ease;[m
+[32m+[m[32m  text-decoration: none;[m
+[32m+[m[32m  display: inline-flex;[m
+[32m+[m[32m  align-items: center;[m
+[32m+[m[32m  gap: 6px;[m
+[32m+[m[32m  background: transparent;[m
+[32m+[m[32m}[m
+[32m+[m[32m.nav-link:hover { background: #f1f5f9; color: var(--primary); }[m
+[32m+[m[32m.nav-link.active { background: #e0e7ff; color: var(--primary); font-weight: 600; }[m
+[32m+[m
+[32m+[m[32m.nav-btn {[m
+[32m+[m[32m  padding: 8px 14px;[m
+[32m+[m[32m  border-radius: 8px;[m
+[32m+[m[32m  font-weight: 500;[m
+[32m+[m[32m  cursor: pointer;[m
+[32m+[m[32m  transition: all 0.2s ease;[m
+[32m+[m[32m  border: 1px solid var(--error);[m
+[32m+[m[32m  background: transparent;[m
+[32m+[m[32m  color: var(--error);[m
+[32m+[m[32m  font-size: 0.95rem;[m
+[32m+[m[32m}[m
+[32m+[m[32m.nav-btn:hover { background: var(--error); color: #fff; }[m
+[32m+[m
+[32m+[m[32m/* Адаптив для узких экранов */[m
+[32m+[m[32m@media (max-width: 640px) {[m
+[32m+[m[32m  .navbar { flex-wrap: wrap; justify-content: center; gap: 10px; padding: 10px 12px; }[m
+[32m+[m[32m  .nav-link, .nav-btn { font-size: 0.9rem; padding: 7px 10px; }[m
+[32m+[m[32m}[m
+[32m+[m[32m.recommendations-block { margin-bottom: 24px; }[m
+[32m+[m[32m.recommendations-block h3 { margin-bottom: 12px; font-size: 1.2rem; color: var(--primary); }[m
+\ No newline at end of file[m
+[1mdiff --git a/frontend/src/pages/Recipes.jsx b/frontend/src/pages/Recipes.jsx[m
+[1mindex 9daa899..3639987 100644[m
+[1m--- a/frontend/src/pages/Recipes.jsx[m
+[1m+++ b/frontend/src/pages/Recipes.jsx[m
+[36m@@ -5,7 +5,7 @@[m [mimport client from '../api/client'[m
+ export default function Recipes() {[m
+   const navigate = useNavigate()[m
+   const inputRef = useRef(null)[m
+[31m-  const hasFetched = useRef(false) // Защита от StrictMode double-fetch[m
+[32m+[m[32m  const hasFetched = useRef(false)[m
+   [m
+   const [recipes, setRecipes] = useState([])[m
+   const [loading, setLoading] = useState(false)[m
+[36m@@ -14,6 +14,8 @@[m [mexport default function Recipes() {[m
+   const [selectedIngredients, setSelectedIngredients] = useState([])[m
+   const [suggestions, setSuggestions] = useState([])[m
+   const [showDropdown, setShowDropdown] = useState(false)[m
+[32m+[m[32m  const [recommended, setRecommended] = useState([])[m
+[32m+[m[32m  const [recsLoading, setRecsLoading] = useState(true)[m
+ [m
+   const fetchRecipes = async (title, ingredients) => {[m
+     setLoading(true)[m
+[36m@@ -32,7 +34,7 @@[m [mexport default function Recipes() {[m
+     }[m
+   }[m
+ [m
+[31m-  // Срабатывает строго один раз при монтировании[m
+[32m+[m[32m  // Загрузка рецептов при монтировании[m
+   useEffect(() => {[m
+     if (!hasFetched.current) {[m
+       hasFetched.current = true[m
+[36m@@ -40,6 +42,17 @@[m [mexport default function Recipes() {[m
+     }[m
+   }, [])[m
+ [m
+[32m+[m[32m  // Загрузка рекомендаций[m
+[32m+[m[32m  useEffect(() => {[m
+[32m+[m[32m    client.get('/recipes/recommendations/')[m
+[32m+[m[32m      .then(res => {[m
+[32m+[m[32m        const list = Array.isArray(res.data) ? res.data : (res.data.results || [])[m
+[32m+[m[32m        setRecommended(list)[m
+[32m+[m[32m      })[m
+[32m+[m[32m      .catch(() => setRecsLoading(false))[m
+[32m+[m[32m      .finally(() => setRecsLoading(false))[m
+[32m+[m[32m  }, [])[m
+[32m+[m
+   const handleIngredientInput = async (e) => {[m
+     const val = e.target.value[m
+     setIngredientInput(val)[m
+[36m@@ -84,6 +97,28 @@[m [mexport default function Recipes() {[m
+     <div className="recipes-page">[m
+       <h2>📖 Рецепты</h2>[m
+       [m
+[32m+[m[32m      {/* Блок рекомендаций — теперь ВНУТРИ return */}[m
+[32m+[m[32m      {recommended.length > 0 && ([m
+[32m+[m[32m        <section className="recommendations-block">[m
+[32m+[m[32m          <h3>Рекомендуем вам</h3>[m
+[32m+[m[32m          <div className="grid">[m
+[32m+[m[32m            {recommended.slice(0, 4).map(r => ([m
+[32m+[m[32m              <div key={`rec-${r.id}`} className="card" onClick={() => navigate(`/recipes/${r.id}`)}>[m
+[32m+[m[32m                <h3 className="recipe-title">{r.title}</h3>[m
+[32m+[m[32m                <div className="card-actions" onClick={e => e.stopPropagation()}>[m
+[32m+[m[32m                  <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_like')}>[m
+[32m+[m[32m                    {r.is_liked ? '❤️' : '🤍'} {r.likes_count || 0}[m
+[32m+[m[32m                  </span>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                <p className="author">Автор: {r.author}</p>[m
+[32m+[m[32m                <p>Ккал: {r.total_calories} | Б: {r.total_proteins}г | Ж: {r.total_fats}г | У: {r.total_carbs}г</p>[m
+[32m+[m[32m              </div>[m
+[32m+[m[32m            ))}[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m        </section>[m
+[32m+[m[32m      )}[m
+[32m+[m[41m      [m
+[32m+[m[32m      {/* Панель поиска */}[m
+       <div className="search-panel">[m
+         <div className="search-row">[m
+           <div className="search-group">[m
+[36m@@ -103,16 +138,23 @@[m [mexport default function Recipes() {[m
+ [m
+         {selectedIngredients.length > 0 && ([m
+           <div className="tags-container">[m
+[31m-            {selectedIngredients.map(ing => (<span key={ing} className="tag">{ing} <button type="button" onClick={() => setSelectedIngredients(prev => prev.filter(i => i !== ing))}>✕</button></span>))}[m
+[32m+[m[32m            {selectedIngredients.map(ing => ([m
+[32m+[m[32m              <span key={ing} className="tag">[m
+[32m+[m[32m                {ing} <button type="button" onClick={() => setSelectedIngredients(prev => prev.filter(i => i !== ing))}>✕</button>[m
+[32m+[m[32m              </span>[m
+[32m+[m[32m            ))}[m
+           </div>[m
+         )}[m
+ [m
+         <div className="search-buttons">[m
+[31m-          <button className="btn-search" onClick={handleSearch} disabled={loading}>{loading ? 'Поиск...' : '🔍 Найти'}</button>[m
+[32m+[m[32m          <button className="btn-search" onClick={handleSearch} disabled={loading}>[m
+[32m+[m[32m            {loading ? 'Поиск...' : '🔍 Найти'}[m
+[32m+[m[32m          </button>[m
+           <button className="btn-reset" onClick={handleReset}>Сбросить</button>[m
+         </div>[m
+       </div>[m
+ [m
+[32m+[m[32m      {/* Сетка рецептов */}[m
+       <div className="grid">[m
+         {loading ? ([m
+           <p className="empty-state">Загрузка...</p>[m
+[36m@@ -123,17 +165,29 @@[m [mexport default function Recipes() {[m
+             <div key={r.id} className="card" onClick={() => navigate(`/recipes/${r.id}`)}>[m
+               <h3 className="recipe-title">[m
+                 {r.title}[m
+[31m-                {r.has_allergens && (<span className="allergen-badge" title={`Содержит: ${r.matched_allergens?.join(', ')}`}>⚠️ Аллерген</span>)}[m
+[32m+[m[32m                {r.has_allergens && ([m
+[32m+[m[32m                  <span className="allergen-badge" title={`Содержит: ${r.matched_allergens?.join(', ')}`}>[m
+[32m+[m[32m                    ⚠️ Аллерген[m
+[32m+[m[32m                  </span>[m
+[32m+[m[32m                )}[m
+               </h3>[m
+               <div className="card-actions" onClick={e => e.stopPropagation()}>[m
+[31m-                <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_like')}>{r.is_liked ? '❤️' : '🤍'} {r.likes_count || 0}</span>[m
+[31m-                <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_favorite')}>{r.is_favorited ? '⭐' : '☆'} {r.favorites_count || 0}</span>[m
+[32m+[m[32m                <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_like')}>[m
+[32m+[m[32m                  {r.is_liked ? '❤️' : '🤍'} {r.likes_count || 0}[m
+[32m+[m[32m                </span>[m
+[32m+[m[32m                <span className="action-btn" onClick={() => toggleAction(r.id, 'toggle_favorite')}>[m
+[32m+[m[32m                  {r.is_favorited ? '⭐' : '☆'} {r.favorites_count || 0}[m
+[32m+[m[32m                </span>[m
+               </div>[m
+               <p className="author">Автор: {r.author}</p>[m
+               <p>Ккал: {r.total_calories} | Б: {r.total_proteins}г | Ж: {r.total_fats}г | У: {r.total_carbs}г</p>[m
+               <details>[m
+                 <summary>Ингредиенты</summary>[m
+[31m-                <ul>{r.ingredients.map(i => (<li key={i.product}>{i.product_name || 'Без названия'} ({i.weight_g} г.)</li>))}</ul>[m
+[32m+[m[32m                <ul>[m
+[32m+[m[32m                  {r.ingredients.map(i => ([m
+[32m+[m[32m                    <li key={i.product}>{i.product_name || 'Без названия'} ({i.weight_g} г.)</li>[m
+[32m+[m[32m                  ))}[m
+[32m+[m[32m                </ul>[m
+               </details>[m
+             </div>[m
+           ))[m
